@@ -1,0 +1,128 @@
+---
+title: "Machine Learning - Course Project"
+output:
+  html_document: default
+  html_notebook: default
+---
+
+#Download data
+
+```{r loadData}
+# urltrain <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+# urltest <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+# download.file(urltrain, destfile="pmltraining.csv")
+# download.file(urltest, destfile="pmltesting.csv")
+
+training <- read.csv("pmltraining.csv")
+testing <- read.csv("pmltesting.csv")
+# head(training)
+# str(training)
+# summary(training)
+
+```
+
+# Goal
+Predict the manner in which the exercise was taken
+
+
+```{r exploration}
+table(training$classe)
+dim(training)
+
+```
+
+# cleaning the data
+1. Remove the Near Zero Variance variables
+
+```{r cleaning}
+library(caret)
+NZV <- nearZeroVar(training, saveMetrics=TRUE)
+training1 <- training[,!NZV$nzv]
+testing1 <- testing[,!NZV$nzv]
+
+```
+
+2. Remove columns that do not contribute much to the accelerometer measurement
+
+```{r cleaning2}
+regex <- grepl("^K|timestamp|user_name", names(training1))
+training2 <- training1[,!regex]
+testing2 <- testing1[,!regex]
+
+```
+
+3. Remove columns that contain NA's
+
+```{r cleaning3}
+cond <- (colSums(is.na(training2))==0)
+training <- training2[,cond]
+testing <- testing2[,cond]
+rm(training2)
+rm(training1)
+rm(testing2)
+rm(testing1)
+
+```
+
+# Partitioning Training Set
+We split the data set into a pure training data set (70%) and a validation data set (30%). We will use the validation data set to conduct cross validation later on.
+```{r parting}
+set.seed(123)
+inTrain <- createDataPartition(training$classe, p=0.7, list=FALSE)
+validation <- training[-inTrain,]
+training <- training[inTrain,]
+
+```
+
+
+# Data Modelling
+
+## Random Forest
+We use a Random Forest algorithm, as it automatically selects important variables and is generally robust to correlated covariates & outliers.
+We will use 3-fold cross validation when applying the algorithm.
+
+```{r randomForest}
+set.seed(123)
+rf <- train(classe~., data=training, method="rf", trControl=trainControl(method="cv",3), ntree=250)
+
+predictRFonVal <- predict(rf,validation)
+confusionMatrix(validation$classe, predictRFonVal)[2]
+accuracy <- confusionMatrix(validation$classe, predictRFonVal)$overall[1]
+accuracy
+#Out of Sample Error
+OSE <- 1 - accuracy
+names(OSE) <- "Out Of Sample Error"
+OSE
+
+```
+This shows that Accuracy is very high >99.9%.
+The out of sample error based on the validation data is <0.02%.
+
+
+# Prediction for Quiz
+```{r}
+predictRFonTest <- predict(rf, newdata=testing)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
